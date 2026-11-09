@@ -1,0 +1,57 @@
+using System.Text.Json.Serialization;
+using JasperFx;
+using JasperFx.CodeGeneration;
+using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
+using Studium_Audit.Api.Extensions;
+using Studium_Audit.Api.HostedServices;
+using Studium_Audit.Data;
+
+var builder = WebApplication.CreateBuilder(args);
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Host=localhost;Port=5432;Database=studium_audit;Username=postgres;Password=postgres";
+
+builder.Services.AddDbContext<AuditDbContext>(
+    options => options.UseNpgsql(connectionString),
+    optionsLifetime: ServiceLifetime.Singleton);
+
+builder.Services.AddHostedService<DatabaseMigrationHostedService>();
+builder.Services.AddProblemDetails();
+
+builder.Services.CritterStackDefaults(options =>
+{
+    options.Development.GeneratedCodeMode = TypeLoadMode.Dynamic;
+    options.Production.GeneratedCodeMode = TypeLoadMode.Static;
+    options.Production.AssertAllPreGeneratedTypesExist = true;
+});
+
+builder.AddStudiumMessaging();
+builder.AddStudiumAuthentication();
+
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+builder.Services.AddOpenApi();
+builder.Services.AddCors(options =>
+    options.AddPolicy("StudiumCors", policy =>
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+
+var app = builder.Build();
+
+app.UseCors("StudiumCors");
+
+app.MapOpenApi();
+app.MapScalarApiReference();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.MapGet("/health", () => Results.Ok(new { status = "Healthy", service = "Studium-Audit" }));
+
+return await app.RunJasperFxCommands(args);
+
+public partial class Program { }

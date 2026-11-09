@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Studium_Audit.Services</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Mapster" />
+    <PackageReference Include="WolverineFx.RabbitMQ" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Domain\Studium-Audit.Domain.csproj" />
+    <ProjectReference Include="..\Data\Studium-Audit.Data.csproj" />
+  </ItemGroup>
+
+</Project>

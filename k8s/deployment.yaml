@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: studium
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: studium-audit-config
+  namespace: studium
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  AWS__Region: "us-east-2"
+  RabbitMQ__ConnectionString: "amqp://studium:StudiumRabbitMQ2026!@studium-rabbitmq-service.studium.svc.cluster.local:5672"
+  RabbitMQ__AuditQueueName: "studium-audit-events-queue"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: studium-audit
+  namespace: studium
+  labels:
+    app: studium-audit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: studium-audit
+  template:
+    metadata:
+      labels:
+        app: studium-audit
+    spec:
+      containers:
+        - name: studium-audit
+          image: IMAGE_PLACEHOLDER
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: studium-audit-config
+          env:
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: studium-audit-secrets
+                  key: DefaultConnection
+            - name: AWS__Cognito__Authority
+              valueFrom:
+                secretKeyRef:
+                  name: studium-audit-secrets
+                  key: CognitoAuthority
+            - name: AWS__Cognito__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: studium-audit-secrets
+                  key: CognitoClientId
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: studium-audit-secrets
+                  key: AwsAccessKeyId
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: studium-audit-secrets
+                  key: AwsSecretAccessKey
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: studium-audit-service
+  namespace: studium
+  labels:
+    app: studium-audit
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8080
+      name: http
+  selector:
+    app: studium-audit
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: studium-audit-hpa
+  namespace: studium
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: studium-audit
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 90

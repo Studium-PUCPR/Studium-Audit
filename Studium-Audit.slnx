@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/Api/">
+    <Project Path="Api/Studium-Audit.Api.csproj" />
+  </Folder>
+  <Folder Name="/Data/">
+    <Project Path="Data/Studium-Audit.Data.csproj" />
+  </Folder>
+  <Folder Name="/Domain/">
+    <Project Path="Domain/Studium-Audit.Domain.csproj" />
+  </Folder>
+  <Folder Name="/Services/">
+    <Project Path="Services/Studium-Audit.Services.csproj" />
+  </Folder>
+  <Folder Name="/Tests/">
+    <Project Path="Tests/Studium-Audit.Tests.csproj" />
+  </Folder>
+</Solution>
