@@ -15,9 +15,9 @@
 - **Problem Solved:** Avoids running database migrations every time a new entity or microservice needs auditing.
 - **Chosen Solution:** Generic resource schema with `ServiceSource`, `ResourceId`, `ActorId`, `Action`, and flexible `MetadataJson` text column.
 
-### 1.3 Asynchronous Ingestion via RabbitMQ
+### 1.3 Asynchronous Ingestion via RabbitMQ & Dead-Letter Handling
 - **Problem Solved:** Audit logging must never block or degrade transactional operations in upstream services.
-- **Chosen Solution:** Ingestion via Wolverine and RabbitMQ consuming `studium-audit-events-queue` using `[MessageIdentity("studium.audit.integration-event")]`. Enabled transactional outbox via `opts.Policies.AutoApplyTransactions()`. Also provides synchronous REST query and post endpoints (`/api/audit/logs`).
+- **Chosen Solution:** Ingestion via Wolverine and RabbitMQ consuming `studium-audit-events-queue` using `[MessageIdentity("studium.audit.integration-event")]`. Enabled transactional outbox via `opts.Policies.AutoApplyTransactions()`. Configured 3x exponential retry backoff for transient failures (`NpgsqlException`, `TimeoutException`, `HttpRequestException`), moving unfixable/poison messages immediately to the dead-letter error queue via `MoveToErrorQueue()`. Also provides synchronous REST query and post endpoints (`/api/audit/logs`).
 
 ### 1.4 Role-Based Access Control (RBAC) & Endpoint Hardening
 - **Decision:** Secured sensitive audit logs against unauthorized inspection and tampering.
@@ -25,6 +25,9 @@
   - Configured `AdminOnly` authorization policy requiring `Administrator`, `admin`, or `Admin` role.
   - Restricted `GET /api/audit/logs` and `POST /api/audit/logs` with `[Authorize(Policy = "AdminOnly")]`.
   - Restricted `GET /api/audit/resources/{id}` with `[Authorize]` to permit authenticated callers.
+
+### 1.5 Database Resilience & Health Check Segregation
+- **Decision:** Segregated liveness (`/health`) from deep database readiness (`/health/ready`). Added `EnableRetryOnFailure(3)` to Npgsql configuration without altering connection lifetimes, preventing temporary socket/network drops during RDS/cluster failovers.
 
 ---
 
@@ -42,7 +45,7 @@
   - `Handlers/AuditIntegrationEventHandler.cs` — Wolverine RabbitMQ handler.
 - `Api/`:
   - `Controllers/AuditController.cs` — REST endpoints (`POST /api/audit/logs`, `GET /api/audit/logs`, `GET /api/audit/resources/{resourceId}`).
-  - `Extensions/MessagingExtensions.cs`, `AuthenticationExtensions.cs`.
+  - `Extensions/MessagingExtensions.cs`, `AuthenticationExtensions.cs`, `DatabaseHealthCheck.cs`.
   - `HostedServices/DatabaseMigrationHostedService.cs`.
 - `Tests/` — Unit test suite.
 - [`Dockerfile`](./Dockerfile) & [`k8s/deployment.yaml`](./k8s/deployment.yaml) — Production containers and Kubernetes manifests.
@@ -50,6 +53,11 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (Database Resilience, Deep Readiness Probe & Wolverine DLQ):**
+  - Added `EnableRetryOnFailure(3)` inside PostgreSQL `UseNpgsql` registration.
+  - Added `DatabaseHealthCheck.cs` verifying database connectivity for Kubernetes `readinessProbe` at `/health/ready`.
+  - Configured Wolverine 3x retry policies with cooldown for `NpgsqlException`, `TimeoutException`, `HttpRequestException`, and routed terminal poison messages to dead-letter error queue (`opts.OnException<Exception>().MoveToErrorQueue()`).
+  - Regenerated Wolverine static handlers via `codegen write` and verified 4/4 unit tests pass.
 - **2026-11-09 (RBAC Hardening, Message Identity & Transactional Outbox):**
   - Configured `AdminOnly` authorization policy and Cognito claim mapping in `AuthenticationExtensions.cs`.
   - Added `[Authorize(Policy = "AdminOnly")]` to `GET /api/audit/logs` and `POST /api/audit/logs`, and `[Authorize]` to `GET /api/audit/resources/{resourceId}`.

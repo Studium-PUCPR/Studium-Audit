@@ -1,5 +1,7 @@
+using Npgsql;
 using Studium_Audit.Services.Handlers;
 using Wolverine;
+using Wolverine.ErrorHandling;
 using Wolverine.RabbitMQ;
 
 namespace Studium_Audit.Api.Extensions;
@@ -22,6 +24,18 @@ public static class MessagingExtensions
             opts.ListenToRabbitQueue(auditQueueName);
 
             opts.Policies.AutoApplyTransactions();
+
+            opts.OnException<NpgsqlException>()
+                .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(5));
+
+            opts.OnException<TimeoutException>()
+                .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(5));
+
+            opts.OnException<HttpRequestException>()
+                .RetryWithCooldown(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), TimeSpan.FromSeconds(5));
+
+            opts.OnException<Exception>()
+                .MoveToErrorQueue();
         });
     }
 }
