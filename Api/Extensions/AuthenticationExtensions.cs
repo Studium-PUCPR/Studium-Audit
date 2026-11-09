@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Studium_Audit.Api.Extensions;
 
@@ -12,14 +13,23 @@ public static class AuthenticationExtensions
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
             {
+                options.MapInboundClaims = false;
                 if (!string.IsNullOrEmpty(authority))
                     options.Authority = authority;
                 if (!string.IsNullOrEmpty(clientId))
                     options.Audience = clientId;
 
                 options.RequireHttpsMetadata = false;
+
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    NameClaimType = "sub",
+                    RoleClaimType = "cognito:groups"
+                };
             });
 
-        builder.Services.AddAuthorization();
+        builder.Services.AddAuthorizationBuilder()
+            .AddPolicy("AdminOnly", policy =>
+                policy.RequireRole("Administrator", "admin", "Admin"));
     }
 }

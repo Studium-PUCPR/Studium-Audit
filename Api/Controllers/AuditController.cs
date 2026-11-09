@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Studium_Audit.Data;
@@ -11,6 +12,7 @@ namespace Studium_Audit.Api.Controllers;
 public class AuditController(AuditDbContext db, ILogger<AuditController> logger) : ControllerBase
 {
     [HttpPost("logs")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<AuditLogDto>> CreateAuditLog(
         [FromBody] CreateAuditLogRequest request,
         CancellationToken ct)
@@ -41,6 +43,7 @@ public class AuditController(AuditDbContext db, ILogger<AuditController> logger)
     }
 
     [HttpGet("logs")]
+    [Authorize(Policy = "AdminOnly")]
     public async Task<ActionResult<PagedAuditLogsResponse>> GetAuditLogs(
         [FromQuery] string? resourceId,
         [FromQuery] string? serviceSource,
@@ -97,6 +100,7 @@ public class AuditController(AuditDbContext db, ILogger<AuditController> logger)
     }
 
     [HttpGet("resources/{resourceId}")]
+    [Authorize]
     public async Task<ActionResult<IReadOnlyList<AuditLogDto>>> GetLogsByResource(
         string resourceId,
         CancellationToken ct = default)

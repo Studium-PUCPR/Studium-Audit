@@ -17,13 +17,20 @@
 
 ### 1.3 Asynchronous Ingestion via RabbitMQ
 - **Problem Solved:** Audit logging must never block or degrade transactional operations in upstream services.
-- **Chosen Solution:** Ingestion via Wolverine and RabbitMQ consuming `studium-audit-events-queue`. Also provides synchronous REST query and post endpoints (`/api/audit/logs`).
+- **Chosen Solution:** Ingestion via Wolverine and RabbitMQ consuming `studium-audit-events-queue` using `[MessageIdentity("studium.audit.integration-event")]`. Enabled transactional outbox via `opts.Policies.AutoApplyTransactions()`. Also provides synchronous REST query and post endpoints (`/api/audit/logs`).
+
+### 1.4 Role-Based Access Control (RBAC) & Endpoint Hardening
+- **Decision:** Secured sensitive audit logs against unauthorized inspection and tampering.
+  - JWT claim mapping: `NameClaimType = "sub"`, `RoleClaimType = "cognito:groups"`.
+  - Configured `AdminOnly` authorization policy requiring `Administrator`, `admin`, or `Admin` role.
+  - Restricted `GET /api/audit/logs` and `POST /api/audit/logs` with `[Authorize(Policy = "AdminOnly")]`.
+  - Restricted `GET /api/audit/resources/{id}` with `[Authorize]` to permit authenticated callers.
 
 ---
 
 ## 2. Project Structure & File Map
 - [`Directory.Build.props`](./Directory.Build.props) & [`Directory.Packages.props`](./Directory.Packages.props) — CPM locking dependencies.
-- [`Studium-Audit.sln`](./Studium-Audit.sln) — Root solution.
+- [`Studium-Audit.slnx`](./Studium-Audit.slnx) — Root solution.
 - `Domain/`:
   - `Entities/AuditLog.cs` — Universal audit entity.
 - `Data/`:
@@ -31,7 +38,7 @@
   - `Configurations/AuditLogConfig.cs` — Fluent API mapping with B-Tree indexes.
   - `Migrations/` — Auto-applied startup migrations.
 - `Services/`:
-  - `DTOs/AuditDtos.cs`, `IntegrationEvents.cs` — Request, response, and event contracts.
+  - `DTOs/AuditDtos.cs`, `IntegrationEvents.cs` — Request, response, and event contracts (`[MessageIdentity("studium.audit.integration-event")]`).
   - `Handlers/AuditIntegrationEventHandler.cs` — Wolverine RabbitMQ handler.
 - `Api/`:
   - `Controllers/AuditController.cs` — REST endpoints (`POST /api/audit/logs`, `GET /api/audit/logs`, `GET /api/audit/resources/{resourceId}`).
@@ -43,6 +50,12 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (RBAC Hardening, Message Identity & Transactional Outbox):**
+  - Configured `AdminOnly` authorization policy and Cognito claim mapping in `AuthenticationExtensions.cs`.
+  - Added `[Authorize(Policy = "AdminOnly")]` to `GET /api/audit/logs` and `POST /api/audit/logs`, and `[Authorize]` to `GET /api/audit/resources/{resourceId}`.
+  - Added `[MessageIdentity("studium.audit.integration-event")]` to `AuditIntegrationEvent` in `Services/DTOs/IntegrationEvents.cs`.
+  - Enabled transactional outbox via `opts.Policies.AutoApplyTransactions()` in `MessagingExtensions.cs`.
+  - Regenerated Wolverine static handlers and verified all 4 unit tests pass.
 - **2026-11-09 (Initial Microservice Scaffold & Implementation):**
   - Scaffolded .NET 10 Clean Architecture solution with PostgreSQL database `studium_audit`.
   - Implemented universal audit schema, EF Core migrations, and Wolverine RabbitMQ handler.
