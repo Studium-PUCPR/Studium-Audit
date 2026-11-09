@@ -15,9 +15,12 @@
 - **Problem Solved:** Avoids running database migrations every time a new entity or microservice needs auditing.
 - **Chosen Solution:** Generic resource schema with `ServiceSource`, `ResourceId`, `ActorId`, `Action`, and flexible `MetadataJson` text column.
 
-### 1.3 Asynchronous Ingestion via RabbitMQ & Dead-Letter Handling
-- **Problem Solved:** Audit logging must never block or degrade transactional operations in upstream services.
-- **Chosen Solution:** Ingestion via Wolverine and RabbitMQ consuming `studium-audit-events-queue` using `[MessageIdentity("studium.audit.integration-event")]`. Enabled transactional outbox via `opts.Policies.AutoApplyTransactions()`. Configured 3x exponential retry backoff for transient failures (`NpgsqlException`, `TimeoutException`, `HttpRequestException`), moving unfixable/poison messages immediately to the dead-letter error queue via `MoveToErrorQueue()`. Also provides synchronous REST query and post endpoints (`/api/audit/logs`).
+### 1.3 Asynchronous Ingestion via RabbitMQ, Inbox Deduplication & Dead-Letter Handling
+- **Problem Solved:** Audit logging must never block or degrade transactional operations in upstream services, while ensuring exactly-once processing across network retries.
+- **Chosen Solution:** Ingestion via Wolverine and RabbitMQ consuming `studium-audit-events-queue` using `[MessageIdentity("studium.audit.integration-event")]`.
+- **Transactional Inbox Pattern:** Implemented in `AuditIntegrationEventHandler` via `InboxMessage` entity (`Id: Guid`, `HandlerName: string`, `ReceivedAtUtc: DateTime`) with unique primary key index and B-Tree index on `ReceivedAtUtc`.
+- **Zero-Overhead Lazy Pruning:** Consumer handler performs throttled cleanup (every 6 hours) via `ExecuteDeleteAsync` for inbox messages older than 7 days, avoiding extra background jobs or cron services.
+- **Resilience & DLQ:** Configured 3x exponential retry backoff for transient failures (`NpgsqlException`, `TimeoutException`, `HttpRequestException`), moving unfixable/poison messages immediately to the dead-letter error queue via `MoveToErrorQueue()`. Also provides synchronous REST query and post endpoints (`/api/audit/logs`).
 
 ### 1.4 Role-Based Access Control (RBAC) & Endpoint Hardening
 - **Decision:** Secured sensitive audit logs against unauthorized inspection and tampering.
@@ -39,13 +42,14 @@
 - [`Studium-Audit.slnx`](./Studium-Audit.slnx) — Root solution.
 - `Domain/`:
   - `Entities/AuditLog.cs` — Universal audit entity.
+  - `Entities/Inbox/InboxMessage.cs` — Inbox message deduplication entity.
 - `Data/`:
-  - `AuditDbContext.cs` — EF Core context with applied configurations.
-  - `Configurations/AuditLogConfig.cs` — Fluent API mapping with B-Tree indexes.
-  - `Migrations/` — Auto-applied startup migrations.
+  - `AuditDbContext.cs` — EF Core context with applied configurations and `InboxMessages` DbSet.
+  - `Configurations/AuditLogConfig.cs`, `Configurations/InboxMessageConfig.cs` — Fluent API mapping with B-Tree indexes.
+  - `Migrations/` — Auto-applied startup migrations including `Add_InboxMessages`.
 - `Services/`:
-  - `DTOs/AuditDtos.cs`, `IntegrationEvents.cs` — Request, response, and event contracts (`[MessageIdentity("studium.audit.integration-event")]`).
-  - `Handlers/AuditIntegrationEventHandler.cs` — Wolverine RabbitMQ handler.
+  - `DTOs/AuditDtos.cs`, `IntegrationEvents.cs` — Request, response, and event contracts (`[MessageIdentity("studium.audit.integration-event")]` with `EventId`).
+  - `Handlers/AuditIntegrationEventHandler.cs` — Wolverine RabbitMQ handler with inbox deduplication and lazy cleanup.
 - `Api/`:
   - `Controllers/AuditController.cs` — REST endpoints (`POST /api/audit/logs`, `GET /api/audit/logs`, `GET /api/audit/resources/{resourceId}`).
   - `Extensions/MessagingExtensions.cs`, `AuthenticationExtensions.cs`, `CorsExtensions.cs`, `DatabaseHealthCheck.cs`.
@@ -56,6 +60,13 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (Transactional Inbox Pattern & EventId Deduplication):**
+  - Added `InboxMessage` entity and `InboxMessageConfig` with B-Tree index on `ReceivedAtUtc`.
+  - Added `DbSet<InboxMessage> InboxMessages` to `AuditDbContext`.
+  - Scaffolded EF Core migration `Add_InboxMessages`.
+  - Added `EventId` to `AuditIntegrationEvent` contract.
+  - Implemented inbox deduplication and 6-hour lazy pruning in `AuditIntegrationEventHandler`.
+  - Regenerated Wolverine handlers and verified 4/4 unit tests pass.
 - **2026-11-09 (Dynamic CORS Configuration):**
   - Added `CorsExtensions.cs` reading allowed origins dynamically from configuration/environment variables.
   - Hooked `AddStudiumCors` and `UseCors(CorsExtensions.PolicyName)` into `Program.cs`.

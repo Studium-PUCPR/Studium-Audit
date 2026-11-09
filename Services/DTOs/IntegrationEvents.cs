@@ -12,4 +12,5 @@ public record AuditIntegrationEvent(
     string ActorId,
     string Action,
     string? MetadataJson = null,
-    DateTime? TimestampUtc = null);
+    DateTime? TimestampUtc = null,
+    Guid? EventId = null);
