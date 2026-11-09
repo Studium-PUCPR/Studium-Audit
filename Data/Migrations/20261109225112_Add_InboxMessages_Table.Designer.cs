@@ -12,8 +12,8 @@ using Studium_Audit.Data;
 namespace Studium_Audit.Data.Migrations
 {
     [DbContext(typeof(AuditDbContext))]
-    [Migration("20261109223145_Add_InboxMessages")]
-    partial class Add_InboxMessages
+    [Migration("20261109225112_Add_InboxMessages_Table")]
+    partial class Add_InboxMessages_Table
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -69,6 +69,27 @@ namespace Studium_Audit.Data.Migrations
                     b.HasIndex("TimestampUtc");
 
                     b.ToTable("AuditLogs", (string)null);
+                });
+
+            modelBuilder.Entity("Studium_Audit.Domain.Entities.Inbox.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HandlerName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivedAtUtc");
+
+                    b.ToTable("InboxMessages", (string)null);
                 });
 #pragma warning restore 612, 618
         }

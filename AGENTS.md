@@ -46,7 +46,7 @@
 - `Data/`:
   - `AuditDbContext.cs` — EF Core context with applied configurations and `InboxMessages` DbSet.
   - `Configurations/AuditLogConfig.cs`, `Configurations/InboxMessageConfig.cs` — Fluent API mapping with B-Tree indexes.
-  - `Migrations/` — Auto-applied startup migrations including `Add_InboxMessages`.
+  - `Migrations/` — Auto-applied startup migrations including `20261109225112_Add_InboxMessages_Table`.
 - `Services/`:
   - `DTOs/AuditDtos.cs`, `IntegrationEvents.cs` — Request, response, and event contracts (`[MessageIdentity("studium.audit.integration-event")]` with `EventId`).
   - `Handlers/AuditIntegrationEventHandler.cs` — Wolverine RabbitMQ handler with inbox deduplication and lazy cleanup.
@@ -60,13 +60,13 @@
 ---
 
 ## 3. Recent Changes History
-- **2026-11-09 (Transactional Inbox Pattern & EventId Deduplication):**
+- **2026-11-09 (Transactional Inbox Pattern, EventId Deduplication & Migration Snapshot Alignment):**
   - Added `InboxMessage` entity and `InboxMessageConfig` with B-Tree index on `ReceivedAtUtc`.
   - Added `DbSet<InboxMessage> InboxMessages` to `AuditDbContext`.
-  - Scaffolded EF Core migration `Add_InboxMessages`.
+  - Re-scaffolded EF Core migration `20261109225112_Add_InboxMessages_Table` with updated `AuditDbContextModelSnapshot` resolving `PendingModelChangesWarning`.
   - Added `EventId` to `AuditIntegrationEvent` contract.
   - Implemented inbox deduplication and 6-hour lazy pruning in `AuditIntegrationEventHandler`.
-  - Regenerated Wolverine handlers and verified 4/4 unit tests pass.
+  - Verified 4/4 unit tests pass.
 - **2026-11-09 (Dynamic CORS Configuration):**
   - Added `CorsExtensions.cs` reading allowed origins dynamically from configuration/environment variables.
   - Hooked `AddStudiumCors` and `UseCors(CorsExtensions.PolicyName)` into `Program.cs`.

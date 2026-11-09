@@ -67,6 +67,27 @@ namespace Studium_Audit.Data.Migrations
 
                     b.ToTable("AuditLogs", (string)null);
                 });
+
+            modelBuilder.Entity("Studium_Audit.Domain.Entities.Inbox.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HandlerName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReceivedAtUtc");
+
+                    b.ToTable("InboxMessages", (string)null);
+                });
 #pragma warning restore 612, 618
         }
     }
