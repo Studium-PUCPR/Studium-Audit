@@ -13,6 +13,7 @@ data:
   AWS__Region: "us-east-2"
   RabbitMQ__ConnectionString: "amqp://studium:StudiumRabbitMQ2026!@studium-rabbitmq-service.studium.svc.cluster.local:5672"
   RabbitMQ__AuditQueueName: "studium-audit-events-queue"
+  Cors__AllowedOrigins: "*"
 ---
 apiVersion: apps/v1
 kind: Deployment

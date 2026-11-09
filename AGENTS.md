@@ -29,6 +29,9 @@
 ### 1.5 Database Resilience & Health Check Segregation
 - **Decision:** Segregated liveness (`/health`) from deep database readiness (`/health/ready`). Added `EnableRetryOnFailure(3)` to Npgsql configuration without altering connection lifetimes, preventing temporary socket/network drops during RDS/cluster failovers.
 
+### 1.6 Dynamic CORS Configuration
+- **Decision:** Created reusable `CorsExtensions.AddStudiumCors(IConfiguration)` reading comma-separated allowed origins from `Cors:AllowedOrigins` or environment variable `CORS_ALLOWED_ORIGINS` / `Cors__AllowedOrigins` (defaulting to allow all for local development).
+
 ---
 
 ## 2. Project Structure & File Map
@@ -45,7 +48,7 @@
   - `Handlers/AuditIntegrationEventHandler.cs` — Wolverine RabbitMQ handler.
 - `Api/`:
   - `Controllers/AuditController.cs` — REST endpoints (`POST /api/audit/logs`, `GET /api/audit/logs`, `GET /api/audit/resources/{resourceId}`).
-  - `Extensions/MessagingExtensions.cs`, `AuthenticationExtensions.cs`, `DatabaseHealthCheck.cs`.
+  - `Extensions/MessagingExtensions.cs`, `AuthenticationExtensions.cs`, `CorsExtensions.cs`, `DatabaseHealthCheck.cs`.
   - `HostedServices/DatabaseMigrationHostedService.cs`.
 - `Tests/` — Unit test suite.
 - [`Dockerfile`](./Dockerfile) & [`k8s/deployment.yaml`](./k8s/deployment.yaml) — Production containers and Kubernetes manifests.
@@ -53,6 +56,11 @@
 ---
 
 ## 3. Recent Changes History
+- **2026-11-09 (Dynamic CORS Configuration):**
+  - Added `CorsExtensions.cs` reading allowed origins dynamically from configuration/environment variables.
+  - Hooked `AddStudiumCors` and `UseCors(CorsExtensions.PolicyName)` into `Program.cs`.
+  - Added `Cors:AllowedOrigins: "*"` in `appsettings.json` and `Cors__AllowedOrigins` in `k8s/deployment.yaml`.
+  - Verified 4/4 unit tests pass.
 - **2026-11-09 (Database Resilience, Deep Readiness Probe & Wolverine DLQ):**
   - Added `EnableRetryOnFailure(3)` inside PostgreSQL `UseNpgsql` registration.
   - Added `DatabaseHealthCheck.cs` verifying database connectivity for Kubernetes `readinessProbe` at `/health/ready`.
